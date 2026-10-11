@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">AR Point Cloud Mapper</string>
+    <string name="camera_permission_required">Camera permission is required to run ARCore and scan point clouds.</string>
+    <string name="export_point_cloud">Export PLY</string>
+    <string name="clear_point_cloud">Clear</string>
+    <string name="point_count_format">Points: %d</string>
+    <string name="export_success">Exported PLY to: %s</string>
+    <string name="export_error">Error exporting PLY: %s</string>
+</resources>
