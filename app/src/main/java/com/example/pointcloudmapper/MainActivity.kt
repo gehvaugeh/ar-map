@@ -1,12 +1,14 @@
 package com.example.pointcloudmapper
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.os.Bundle
 import android.util.Log
+import android.view.WindowManager
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
@@ -44,6 +46,9 @@ class MainActivity : AppCompatActivity(), GLSurfaceView.Renderer {
 
     private val backgroundRenderer = BackgroundRenderer()
     private val pointCloudRenderer = PointCloudRenderer()
+
+    private var viewportWidth = 0
+    private var viewportHeight = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -152,8 +157,13 @@ class MainActivity : AppCompatActivity(), GLSurfaceView.Renderer {
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+        viewportWidth = width
+        viewportHeight = height
         GLES20.glViewport(0, 0, width, height)
-        session?.setDisplayGeometry(0, width, height)
+
+        val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val displayRotation = windowManager.defaultDisplay.rotation
+        session?.setDisplayGeometry(displayRotation, width, height)
     }
 
     override fun onDrawFrame(gl: GL10?) {
@@ -165,7 +175,6 @@ class MainActivity : AppCompatActivity(), GLSurfaceView.Renderer {
             val frame: Frame = currentSession.update()
             val camera: Camera = frame.camera
 
-            // Draw background camera texture
             backgroundRenderer.draw(frame)
 
             if (camera.trackingState == com.google.ar.core.TrackingState.TRACKING) {
@@ -178,10 +187,10 @@ class MainActivity : AppCompatActivity(), GLSurfaceView.Renderer {
 
                 if (image != null) {
                     val points = ColorProjectionUtils.extractColoredPoints(
-                        pointCloudBuffer = pointCloud.points,
+                        pointCloud = pointCloud,
                         camera = camera,
                         image = image,
-                        minConfidence = 0.1f
+                        minConfidence = 0.3f
                     )
 
                     pointCloudManager.addPoints(points)
@@ -195,7 +204,6 @@ class MainActivity : AppCompatActivity(), GLSurfaceView.Renderer {
                 pointCloud.release()
             }
 
-            // Get Projection and View matrices
             val projMatrix = FloatArray(16)
             val viewMatrix = FloatArray(16)
             val mvpMatrix = FloatArray(16)
@@ -204,7 +212,6 @@ class MainActivity : AppCompatActivity(), GLSurfaceView.Renderer {
             camera.getViewMatrix(viewMatrix, 0)
             android.opengl.Matrix.multiplyMM(mvpMatrix, 0, projMatrix, 0, viewMatrix, 0)
 
-            // Draw accumulated point cloud
             val accumulatedPoints = pointCloudManager.getPoints()
             pointCloudRenderer.updatePoints(accumulatedPoints)
             pointCloudRenderer.draw(mvpMatrix)
