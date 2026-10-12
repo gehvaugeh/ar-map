@@ -22,6 +22,8 @@ import com.example.pointcloudmapper.rendering.BackgroundRenderer
 import com.example.pointcloudmapper.rendering.PointCloudRenderer
 import com.example.pointcloudmapper.spatial.VoxelGridPointCloudManager
 import com.google.ar.core.Camera
+import com.google.ar.core.CameraConfig
+import com.google.ar.core.CameraConfigFilter
 import com.google.ar.core.Config
 import com.google.ar.core.Frame
 import com.google.ar.core.Session
@@ -49,6 +51,10 @@ class MainActivity : AppCompatActivity(), GLSurfaceView.Renderer {
 
     private var viewportWidth = 0
     private var viewportHeight = 0
+
+    // Frame throttling counter to decouple 60FPS UI rendering from point extraction
+    private var frameCounter = 0
+    private val PROCESS_EVERY_N_FRAMES = 3 // Process depth/points every 3rd frame (~10 FPS)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -122,6 +128,20 @@ class MainActivity : AppCompatActivity(), GLSurfaceView.Renderer {
                     config.depthMode = Config.DepthMode.AUTOMATIC
                 }
 
+                // Select lower camera resolution to minimize CPU/GPU bandwidth and latency
+                val filter = CameraConfigFilter(session)
+                filter.targetFps = java.util.EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
+                val cameraConfigs = session?.getSupportedCameraConfigs(filter)
+                if (!cameraConfigs.isNullOrEmpty()) {
+                    // Sort by resolution area ascending to pick the lower CPU resolution (e.g. 640x480)
+                    val lowestResConfig = cameraConfigs.minByOrNull {
+                        it.imageSize.width * it.imageSize.height
+                    }
+                    if (lowestResConfig != null) {
+                        session?.cameraConfig = lowestResConfig
+                    }
+                }
+
                 session?.configure(config)
             } catch (e: UnavailableException) {
                 Log.e(TAG, "ARCore Unavailable", e)
@@ -184,7 +204,10 @@ class MainActivity : AppCompatActivity(), GLSurfaceView.Renderer {
 
             backgroundRenderer.draw(frame)
 
-            if (camera.trackingState == com.google.ar.core.TrackingState.TRACKING) {
+            frameCounter++
+
+            // Throttle depth/pointcloud processing every N frames to eliminate lag
+            if (frameCounter % PROCESS_EVERY_N_FRAMES == 0 && camera.trackingState == com.google.ar.core.TrackingState.TRACKING) {
                 val image = try {
                     frame.acquireCameraImage()
                 } catch (e: Exception) {
