@@ -11,21 +11,22 @@ import java.io.File
 class PointCloudMapperUnitTest {
 
     @Test
-    fun testVoxelGridDeduplication() {
-        val manager = VoxelGridPointCloudManager(voxelSize = 0.05f) // 5cm voxels
+    fun testPointTrackingById() {
+        val manager = VoxelGridPointCloudManager(voxelSize = 0.05f)
 
-        // Point 1 in voxel (0, 0, 0)
-        val p1 = ColoredPoint(0.01f, 0.01f, 0.01f, 255, 0, 0, confidence = 0.5f)
-        // Point 2 in same voxel (0, 0, 0) with higher confidence
-        val p2 = ColoredPoint(0.02f, 0.02f, 0.02f, 0, 255, 0, confidence = 0.9f)
-        // Point 3 in different voxel (1, 1, 1) -> coordinates (0.06, 0.06, 0.06)
-        val p3 = ColoredPoint(0.06f, 0.06f, 0.06f, 0, 0, 255, confidence = 0.8f)
+        // Point with ID 100 initially observed at position (0.01, 0.01, 0.01) with confidence 0.5
+        val p1 = ColoredPoint(id = 100, x = 0.01f, y = 0.01f, z = 0.01f, r = 255, g = 0, b = 0, confidence = 0.5f)
+        // Point with ID 100 refined by ARCore SLAM to position (0.012, 0.011, 0.010) with higher confidence 0.9
+        val p2 = ColoredPoint(id = 100, x = 0.012f, y = 0.011f, z = 0.010f, r = 0, g = 255, b = 0, confidence = 0.9f)
+        // Point with ID 101 at different location
+        val p3 = ColoredPoint(id = 101, x = 0.06f, y = 0.06f, z = 0.06f, r = 0, g = 0, b = 255, confidence = 0.8f)
 
         manager.addPoint(p1)
         assertEquals(1, manager.pointCount())
 
         manager.addPoint(p2)
-        assertEquals(1, manager.pointCount()) // Replaced in same voxel because p2 has higher confidence
+        assertEquals(1, manager.pointCount()) // Updated point 100
+        assertEquals(0.012f, manager.getPoints()[0].x, 0.0001f)
         assertEquals(255, manager.getPoints()[0].g)
 
         manager.addPoint(p3)
@@ -38,8 +39,8 @@ class PointCloudMapperUnitTest {
         tempFile.deleteOnExit()
 
         val points = listOf(
-            ColoredPoint(1.0f, 2.0f, 3.0f, 255, 128, 64),
-            ColoredPoint(-0.5f, 0.0f, 1.2f, 0, 255, 0)
+            ColoredPoint(id = 1, x = 1.0f, y = 2.0f, z = 3.0f, r = 255, g = 128, b = 64),
+            ColoredPoint(id = 2, x = -0.5f, y = 0.0f, z = 1.2f, r = 0, g = 255, b = 0)
         )
 
         PlyExporter.exportToAsciiPly(points, tempFile)

@@ -10,13 +10,14 @@ import kotlin.math.floor
 data class VoxelKey(val x: Int, val y: Int, val z: Int)
 
 /**
- * Manages a persistent 3D point cloud with voxel grid spatial deduplication.
+ * Manages a persistent 3D point cloud tracking points by ARCore feature Point ID and voxel grid filtering.
  *
  * @param voxelSize The size of each 3D voxel cubic cell in meters (e.g. 0.02f = 2cm).
  */
 class VoxelGridPointCloudManager(val voxelSize: Float = 0.02f) {
 
-    private val grid = ConcurrentHashMap<VoxelKey, ColoredPoint>()
+    // Map feature point ID to current ColoredPoint
+    private val pointsById = ConcurrentHashMap<Int, ColoredPoint>()
 
     /**
      * Converts world 3D coordinates into voxel key indices.
@@ -30,21 +31,19 @@ class VoxelGridPointCloudManager(val voxelSize: Float = 0.02f) {
     }
 
     /**
-     * Adds a point if the voxel cell is empty or if the new point has higher confidence.
-     * Returns true if a new point was added or updated.
+     * Adds or updates a point by its unique ARCore feature ID.
      */
     fun addPoint(point: ColoredPoint): Boolean {
-        val key = getVoxelKey(point.x, point.y, point.z)
-        val existing = grid[key]
-        if (existing == null || point.confidence > existing.confidence) {
-            grid[key] = point
+        val existing = pointsById[point.id]
+        if (existing == null || point.confidence >= existing.confidence) {
+            pointsById[point.id] = point
             return true
         }
         return false
     }
 
     /**
-     * Adds a list of points to the grid.
+     * Adds a list of points.
      */
     fun addPoints(points: List<ColoredPoint>): Int {
         var addedCount = 0
@@ -57,23 +56,23 @@ class VoxelGridPointCloudManager(val voxelSize: Float = 0.02f) {
     }
 
     /**
-     * Returns all accumulated points.
+     * Returns all accumulated unique feature points.
      */
     fun getPoints(): List<ColoredPoint> {
-        return grid.values.toList()
+        return pointsById.values.toList()
     }
 
     /**
      * Returns the total number of points in the point cloud.
      */
     fun pointCount(): Int {
-        return grid.size
+        return pointsById.size
     }
 
     /**
      * Clears all stored points.
      */
     fun clear() {
-        grid.clear()
+        pointsById.clear()
     }
 }
