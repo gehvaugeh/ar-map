@@ -42,7 +42,7 @@ class MainActivity : AppCompatActivity(), GLSurfaceView.Renderer {
     private lateinit var btnExport: Button
 
     private var session: Session? = null
-    private val pointCloudManager = VoxelGridPointCloudManager(voxelSize = 0.02f)
+    private val pointCloudManager = VoxelGridPointCloudManager(voxelSize = 0.03f)
 
     private val backgroundRenderer = BackgroundRenderer()
     private val pointCloudRenderer = PointCloudRenderer()
@@ -115,6 +115,13 @@ class MainActivity : AppCompatActivity(), GLSurfaceView.Renderer {
                 session = Session(this)
                 val config = Config(session)
                 config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+
+                if (session?.isDepthModeSupported(Config.DepthMode.RAW_DEPTH_ONLY) == true) {
+                    config.depthMode = Config.DepthMode.RAW_DEPTH_ONLY
+                } else if (session?.isDepthModeSupported(Config.DepthMode.AUTOMATIC) == true) {
+                    config.depthMode = Config.DepthMode.AUTOMATIC
+                }
+
                 session?.configure(config)
             } catch (e: UnavailableException) {
                 Log.e(TAG, "ARCore Unavailable", e)
@@ -178,7 +185,6 @@ class MainActivity : AppCompatActivity(), GLSurfaceView.Renderer {
             backgroundRenderer.draw(frame)
 
             if (camera.trackingState == com.google.ar.core.TrackingState.TRACKING) {
-                val pointCloud = frame.acquirePointCloud()
                 val image = try {
                     frame.acquireCameraImage()
                 } catch (e: Exception) {
@@ -187,10 +193,9 @@ class MainActivity : AppCompatActivity(), GLSurfaceView.Renderer {
 
                 if (image != null) {
                     val points = ColorProjectionUtils.extractColoredPoints(
-                        pointCloud = pointCloud,
+                        frame = frame,
                         camera = camera,
-                        image = image,
-                        minConfidence = 0.3f
+                        yuvImage = image
                     )
 
                     pointCloudManager.addPoints(points)
@@ -200,8 +205,6 @@ class MainActivity : AppCompatActivity(), GLSurfaceView.Renderer {
                         updatePointCountUI()
                     }
                 }
-
-                pointCloud.release()
             }
 
             val projMatrix = FloatArray(16)
